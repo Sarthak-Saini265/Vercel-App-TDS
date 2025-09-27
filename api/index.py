@@ -1,9 +1,14 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import numpy as np
+import os
 
 # Load telemetry data
-with open('q-vercel-latency.json', 'r') as f:
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+json_path = os.path.join(parent_dir, 'q-vercel-latency.json')
+
+with open(json_path, 'r') as f:
     telemetry = json.load(f)
 
 class handler(BaseHTTPRequestHandler):
