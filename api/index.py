@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import numpy as np
@@ -10,7 +10,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods
+    allow_methods=["GET", "POST", "OPTIONS"],  # Explicitly allow methods
     allow_headers=["*"],  # Allow all headers
 )
 
@@ -18,8 +18,24 @@ app.add_middleware(
 with open('q-vercel-latency.json', 'r') as f:
     telemetry = json.load(f)
 
+@app.options("/")
+async def options_handler():
+    return Response(
+        content="",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
 @app.post("/")
-def get_metrics(request: dict):
+def get_metrics(request: dict, response: Response):
+    # Set CORS headers explicitly
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS, GET"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    
     regions = request.get("regions", [])
     threshold = request.get("threshold_ms", 180)
 
