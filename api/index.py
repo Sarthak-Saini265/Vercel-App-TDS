@@ -1,6 +1,6 @@
 import json
 import numpy as np
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
@@ -8,28 +8,22 @@ import os
 
 app = FastAPI()
 
-# Enable CORS to allow POST requests from any origin
+# Enable CORS to allow requests from any origin
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"]    # Expose all the headers to the browser in response
+    allow_headers=["*"]
 )
 
-
-# Load telemetry data
 def load_telemetry_data():
     try:
-        # Try to load from the same directory as the script
         current_dir = os.path.dirname(os.path.abspath(__file__))
         json_path = os.path.join(os.path.dirname(current_dir), 'q-vercel-latency.json')
-        
         with open(json_path, 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        # Fallback: embedded data if file not found
         return [
             {"region": "apac", "service": "analytics", "latency_ms": 204.41, "uptime_pct": 98.045, "timestamp": 20250301},
             {"region": "apac", "service": "recommendations", "latency_ms": 209.81, "uptime_pct": 98.435, "timestamp": 20250302},
@@ -69,47 +63,23 @@ def load_telemetry_data():
             {"region": "amer", "service": "payments", "latency_ms": 226.51, "uptime_pct": 98.832, "timestamp": 20250312}
         ]
 
-# Load data once at startup
 telemetry_data = load_telemetry_data()
 
 class TelemetryRequest(BaseModel):
     regions: List[str]
     threshold_ms: float
 
-class RegionMetrics(BaseModel):
-    avg_latency: float
-    p95_latency: float
-    avg_uptime: float
-    breaches: int
-
 @app.get("/")
 async def health_check():
     return "The health check is successful!"
 
-@app.options("/")
-@app.options("/telemetry")
-async def handle_options(response: Response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    response.headers["Access-Control-Max-Age"] = "86400"
-    return {"message": "OK"}
-
 @app.post("/")
 @app.post("/telemetry")
-async def process_telemetry(request: TelemetryRequest, response: Response):
-    # Explicitly set CORS headers
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    
+async def process_telemetry(request: TelemetryRequest):
     try:
         result = {}
-        
         for region in request.regions:
-            # Filter data for the specific region
             region_data = [record for record in telemetry_data if record["region"] == region]
-            
             if not region_data:
                 result[region] = {
                     "avg_latency": 0.0,
@@ -118,42 +88,23 @@ async def process_telemetry(request: TelemetryRequest, response: Response):
                     "breaches": 0
                 }
                 continue
-            
-            # Extract latency and uptime values
+
             latencies = [record["latency_ms"] for record in region_data]
             uptimes = [record["uptime_pct"] for record in region_data]
-            
-            # Calculate metrics
+
             avg_latency = np.mean(latencies)
             p95_latency = np.percentile(latencies, 95)
             avg_uptime = np.mean(uptimes)
             breaches = sum(1 for latency in latencies if latency > request.threshold_ms)
-            
+
             result[region] = {
                 "avg_latency": round(avg_latency, 2),
                 "p95_latency": round(p95_latency, 2),
                 "avg_uptime": round(avg_uptime, 3),
                 "breaches": breaches
             }
-        
-        # Create response ensuring all requested regions have stats
-        response_data = {}
-        
-        # Add each requested region with its stats
-        for region in request.regions:
-            if region in result:
-                response_data[region] = result[region]
-            else:
-                # Fallback stats if region not found
-                response_data[region] = {
-                    "avg_latency": 0.0,
-                    "p95_latency": 0.0,
-                    "avg_uptime": 0.0,
-                    "breaches": 0
-                }
-        
-        # Return as a top-level 'regions' object
-        return {"regions": response_data}
-    
+
+        return {"regions": result}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
