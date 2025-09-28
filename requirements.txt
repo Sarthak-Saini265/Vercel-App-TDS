@@ -1,3 +1,2 @@
-numpy
 fastapi
-pydantic
+numpy
