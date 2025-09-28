@@ -17,4 +17,11 @@ jobs:
       - name: List files in the repository
         run: |
           ls ${{ github.workspace }}
+      - name: prime-cache-eb1c1ae
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/demo
+          key: cache-eb1c1ae
+      - run: echo "Cache result ${{ steps.cache.outputs.cache-hit }}"
       - run: echo "🍏 This job's status is ${{ job.status }}."
