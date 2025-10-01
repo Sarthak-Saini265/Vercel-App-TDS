@@ -10,9 +10,9 @@ app = FastAPI()
 # It specifies the checker's origin, which is required when credentials are allowed.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://exam.sanand.workers.dev"],
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
